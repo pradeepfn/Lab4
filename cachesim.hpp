@@ -20,6 +20,14 @@ struct cache_stats_t {
     double   storage_overhead_ratio;
 };
 
+typedef struct cache_block_{
+    uint64_t last_access_time;
+	uint64_t tag;
+    bool v0;
+	bool v1;
+	bool dirty;
+} cache_block_t; 
+
 void cache_access(char rw, uint64_t address, cache_stats_t* p_stats);
 void setup_cache(uint64_t c, uint64_t b, uint64_t s, uint64_t v, char st, char r);
 void complete_cache(cache_stats_t *p_stats);
