@@ -1,9 +1,13 @@
 #include "cachesim.hpp"
 #include <math.h>
+#include <stdio.h>
+#include <assert.h>
+#include <stdlib.h>
 
 
 cache_block_t **cache;
 cache_block_t *victim_cache;
+cache_block_t *dummy_cache;
 
 uint64_t ncache_blocks;
 uint64_t cache_block_size;
@@ -14,10 +18,14 @@ uint64_t block_mask;
 uint64_t nsets;
 uint64_t timestamp =0;
 
+uint64_t nb;
+uint64_t nc;
+uint64_t ns;
+
 char blocking_policy;
 char replacement_policy;
 
-bool is_debug = true;
+bool is_debug = false;
 
 /**
  * Subroutine for initializing the cache. You many add and initialize any global or heap
@@ -32,28 +40,41 @@ bool is_debug = true;
  * @r The replacement policy, LRU or NMRU_FIFO (refer to project description for details)
  */
 void setup_cache(uint64_t c, uint64_t b, uint64_t s, uint64_t v, char st, char r) {
-	int i;
-
+	uint64_t i;
+	if(is_debug){
+		printf("setting up cache\n");	
+	}	
 	ncache_blocks = pow(2,s);
 	cache_block_size = pow(2,b);
+	nb = b;
+	nc = c;
+	ns = s;
 	cache_size = pow(2,c);
 	nvictim_cache_blocks = pow(2,v); 
 
 	blocking_policy = st;
 	replacement_policy = r;	
 
-    tag_mask = pow(2, c-s);
-	block_mask = pow(2,b); 
+    tag_mask = pow(2, c-s)-1;
+	block_mask = pow(2,b)-1; 
 
 	// setting up cache strucutre	
 	nsets = pow(2,(c-b-s));
-	cache = malloc(sizeof(cache_block_t *)*nsets);
+	cache = (cache_block_t **)malloc(sizeof(cache_block_t *)*nsets);
 	for(i=0; i < nsets; i++){
-		cache[i] = malloc(sizeof(cache_block_t)*ncache_blocks);	
+		cache[i] = (cache_block_t *)malloc(sizeof(cache_block_t)*ncache_blocks);	
 	}
 	// setting up victim cache
-	victim_cache = malloc(sizeof(cache_block_t)*nvictim_cache_blocks);
+	victim_cache = (cache_block_t *)malloc(sizeof(cache_block_t)*nvictim_cache_blocks);
+	dummy_cache = (cache_block_t *)malloc(sizeof(cache_block_t)*nvictim_cache_blocks);
 
+	if(is_debug){
+		printf("Done setting up cache...\n");	
+		printf("nsets: %" PRIu64 "\n",nsets);
+		printf("ncache_blocks: %" PRIu64 "\n",ncache_blocks);
+		printf("tag_mask: %" PRIu64 "\n",tag_mask);
+		printf("block_mask: %" PRIu64 "\n",block_mask);
+	}	
 }
     
 uint64_t get_timestmp(){
@@ -67,9 +88,9 @@ uint64_t get_timestmp(){
 	return : 1 - victim cache hit
 			 0 - cache miss 
 */
-int finding_victim_cache(uint64_t address, int *indexp){
-	int i;
-	int lru=0;
+int finding_victim_cache(uint64_t address, uint64_t *indexp){
+	uint64_t i;
+	uint64_t lru=0;
 	uint64_t tag  = address & (~block_mask);
 	for(i=0; i < nvictim_cache_blocks ; i++){
 		if(victim_cache[i].tag == tag){ // victim cache hit
@@ -84,15 +105,15 @@ int finding_victim_cache(uint64_t address, int *indexp){
 	return 0;
 }
 
-int find_lru_block(cache_block_t * cache_set, int size){
-	int i;
-	int lru=0;
-	for(i=0; i< size;i++){
-		cache_set[i].last_access_time < victim_cache[lru].last_access_time){
+int find_lru_block(cache_block_t * cache_set, uint64_t size){
+	uint64_t i;
+	uint64_t lru=0;
+	for(i=0; i < size ;i++){
+	    if(cache_set[i].last_access_time < cache_set[lru].last_access_time){
 			lru=i;
 		}
 	}	
-	return i;
+	return lru;
 }
 
 
@@ -109,11 +130,17 @@ int find_nmru_fifo_block(cache_block_t *cache_set, int size){
  * @p_stats Pointer to the statistics structure
  */
 void cache_access(char rw, uint64_t address, cache_stats_t* p_stats) {
-	int i; 
-	int mc_index,vc_index;
+	uint64_t i; 
+	uint64_t mc_index,vc_index;
 
-	uint64_t tag = address & (~tag_mask);
-	uint64_t set_index = (address & tag_mask) & (~block_mask);
+	uint64_t tag = address >> (nc-ns);
+	uint64_t set_index = (address & tag_mask) >> nb;
+
+	if(is_debug){
+		printf("cache request: %" PRIu64 "\n",address);
+		printf("main cache tag: %" PRIu64 "\n",tag);
+		printf("set index: %" PRIu64 "\n\n",set_index);
+	}
 	assert(set_index >= 0 && set_index <nsets);
 	
 	for(i=0; i < ncache_blocks ; i++){
@@ -126,13 +153,15 @@ void cache_access(char rw, uint64_t address, cache_stats_t* p_stats) {
 		}
 	}	 	
     // cache miss. get the cache index to evict.
-	if(replacement_policy = 'L'){
+	if(replacement_policy == 'L'){
 		mc_index = find_lru_block(cache[set_index],ncache_blocks);	
-	}else if(replacement_policy = 'N'){
+		assert(mc_index >=0 && mc_index < ncache_blocks);
+	}else if(replacement_policy == 'N'){ 
 		mc_index = find_nmru_fifo_block(cache[set_index],ncache_blocks);
 	}	
 
-    int found = findin_victim_cache(address,&vc_index);
+    int found = finding_victim_cache(address,&vc_index);
+	assert(vc_index >=0 && vc_index < nvictim_cache_blocks);
 	if(found){ //victim hit. swap the block
 		cache_block_t temp = cache[set_index][mc_index];
 		cache[set_index][mc_index] = victim_cache[vc_index];
@@ -165,4 +194,14 @@ void cache_access(char rw, uint64_t address, cache_stats_t* p_stats) {
  * @p_stats Pointer to the statistics structure
  */
 void complete_cache(cache_stats_t *p_stats) {
+// free memory	
+	uint64_t i;
+	for(i=0; i<nsets ; i++){
+		free(cache[i]);
+	}
+	free(victim_cache);
+
+
+
 }
+
