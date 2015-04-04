@@ -92,13 +92,14 @@ void setup_cache(uint64_t c, uint64_t b, uint64_t s, uint64_t v, char st, char r
 			victim_cache[j].v[0] = false;	
 			victim_cache[j].v[1] = false;	
 	}
-
+	if(is_debug){
 		printf("Done setting up cache...\n");	
 		printf("nsets: %" PRIu64 "\n",nsets);
 		printf("ncache_blocks: %" PRIu64 "\n",ncache_blocks);
 		printf("tag_mask: %" PRIu64 "\n",tag_mask);
 		printf("block_mask: %" PRIu64 "\n",block_mask);
 		printf("nvictim cache_blocks: %" PRIu64 "\n\n",nvictim_cache_blocks);
+	}
 }
     
 uint64_t get_timestmp(){
@@ -153,11 +154,24 @@ int find_lru_block(cache_block_t * cache_set, uint64_t size){
 	}	
 	return lru_index;
 }
-
+int find_mru_block(cache_block_t * cache_set, uint64_t size){
+	uint64_t i;
+	uint64_t mru_index;
+   bool initialized = false;
+	for(i=0; i < size ;i++){
+		if(!initialized){
+			mru_index=i;
+			initialized = true;
+	    }else if(cache_set[i].last_access_time > cache_set[mru_index].last_access_time){
+			mru_index=i;
+		}
+	}	
+	return mru_index;
+}
 
 int find_nmru_fifo_block(cache_block_t *cache_set, uint64_t size){
    //first get the LRU block
-   uint64_t lru_index = find_lru_block(cache_set,size);
+   uint64_t lru_index = find_mru_block(cache_set,size);
    uint64_t i;
    uint64_t oldest_index;
    bool initialized = false;
