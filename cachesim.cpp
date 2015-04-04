@@ -27,6 +27,8 @@ char blocking_policy;
 char replacement_policy;
 
 bool is_debug = false;
+double hit_time = 0;
+double miss_penalty = 0;
 
 double get_hit_time();
 double get_blocking_mpenalty();
@@ -75,6 +77,7 @@ void setup_cache(uint64_t c, uint64_t b, uint64_t s, uint64_t v, char st, char r
 			cache[i][j].last_access_time = 0;
 			cache[i][j].brought_in_time = 0;
 			cache[i][j].tag = 0;	
+			cache[i][j].vtag = 0;	
 			cache[i][j].v[0] = false;	
 			cache[i][j].v[1] = false;	
 		}
@@ -85,6 +88,7 @@ void setup_cache(uint64_t c, uint64_t b, uint64_t s, uint64_t v, char st, char r
 			victim_cache[j].last_access_time = 0;
 			victim_cache[j].brought_in_time = 0;
 			victim_cache[j].tag = 0;	
+			victim_cache[j].vtag = 0;	
 			victim_cache[j].v[0] = false;	
 			victim_cache[j].v[1] = false;	
 	}
@@ -110,7 +114,8 @@ uint64_t get_timestmp(){
 */
 int find_in_victim_cache(uint64_t vtag, uint64_t *indexp){
 	uint64_t i;
-	uint64_t lru=0;
+	uint64_t lru_index;
+	bool initialized = false;
 	for(i=0; i < nvictim_cache_blocks ; i++){
 		if(victim_cache[i].vtag == vtag){ // victim cache hit
 			*indexp=i;
@@ -118,15 +123,19 @@ int find_in_victim_cache(uint64_t vtag, uint64_t *indexp){
 				printf("victim_cache hit, lru index : %" PRIu64 "\n",*indexp);
 			}
 			 return 1;
-		} 
-		if(victim_cache[i].last_access_time < victim_cache[lru].last_access_time){
-			lru = i;	
+		}
+
+        if(!initialized){
+			lru_index = i; 
+			initialized = true;
+		}else if(victim_cache[i].last_access_time < victim_cache[lru_index].last_access_time){
+			lru_index = i;	
 		}
 	} 
 	if(is_debug){
-		printf("victime_cache miss, lru index : %" PRIu64 "\n",lru);
+		printf("victime_cache miss, lru index : %" PRIu64 "\n",lru_index);
 	}
-	*indexp=lru;
+	*indexp=lru_index;
 	return 0;
 }
 
@@ -136,7 +145,7 @@ int find_lru_block(cache_block_t * cache_set, uint64_t size){
    bool initialized = false;
 	for(i=0; i < size ;i++){
 		if(!initialized){
-			lru_index=0;
+			lru_index=i;
 			initialized = true;
 	    }else if(cache_set[i].last_access_time < cache_set[lru_index].last_access_time){
 			lru_index=i;
@@ -213,7 +222,9 @@ void cache_access(char rw, uint64_t address, cache_stats_t* p_stats) {
 		}
 	}
 	assert(tot==0 || tot==1);
-	
+	// irrespective of a miss or hit this is a common overhead	
+	hit_time += get_hit_time(); 
+
 	for(i=0; i < ncache_blocks ; i++){
 		if(cache[set_index][i].tag == tag){ //cache hit
 			if(blocking_policy == 'B'){
@@ -239,7 +250,9 @@ void cache_access(char rw, uint64_t address, cache_stats_t* p_stats) {
 						printf("sub-block miss. bringing in other half\n\n");
 					}	
 					cache[set_index][i].v[sblock_index] = true;
+					assert(cache[set_index][i].v[1-sblock_index]);
 					cache[set_index][i].last_access_time = get_timestmp();
+					cache[set_index][i].brought_in_time = get_timestmp();
 					if(rw == READ){
 						p_stats->read_misses_combined++;
 						p_stats->read_misses++;
@@ -251,8 +264,8 @@ void cache_access(char rw, uint64_t address, cache_stats_t* p_stats) {
 					} 
 					return;
 				} 
-				break;
 			}
+			assert(false); // unreachable
 		}
 	}	 	
     // at this point main cache miss has happened
@@ -278,12 +291,14 @@ void cache_access(char rw, uint64_t address, cache_stats_t* p_stats) {
 
 	if(found){ //victim hit. swap the block
 		//assert(false);
+		assert(is_cblock_valid(cache[set_index][mc_index]));
 		if(is_debug){
 			printf("found in victim cache\n");
 		}	
 		cache_block_t temp = cache[set_index][mc_index];
 
 		cache[set_index][mc_index] = victim_cache[vc_index];
+		assert(cache[set_index][mc_index].tag == tag);
 		cache[set_index][mc_index].last_access_time = get_timestmp();
 		cache[set_index][mc_index].brought_in_time = get_timestmp();
 		if(blocking_policy == 'B'){
@@ -294,16 +309,18 @@ void cache_access(char rw, uint64_t address, cache_stats_t* p_stats) {
 				assert(cache[set_index][mc_index].v[1-sblock_index]);
 				if(is_debug){
 					printf("sub block not found, bringing in other half\n\n");
-				}	
-				//bringing in the other half	
-				cache[set_index][mc_index].v[sblock_index] = true;
+				}
 				if(rw == READ){
 					p_stats->read_misses_combined++;
 					p_stats->misses++;
 				}else if(rw == WRITE){
 					p_stats->write_misses_combined++;
 					p_stats->misses++;
-				} 
+				}	
+				//bringing in the other half	
+				cache[set_index][mc_index].v[sblock_index] = true;
+			}else{
+			//	assert(false);
 			}
 		}
 
@@ -334,7 +351,7 @@ void cache_access(char rw, uint64_t address, cache_stats_t* p_stats) {
 			cache[set_index][mc_index].v[1] = true;
 		}else if(blocking_policy == 'S'){
 			cache[set_index][mc_index].v[sblock_index] = true;
-			cache[set_index][mc_index].v[~sblock_index] = false;
+			cache[set_index][mc_index].v[1-sblock_index] = false;
 		}
 		if(is_cblock_valid(temp)){ // we push to the victim cache only if valid
 			if(is_debug){
@@ -361,14 +378,15 @@ void complete_cache(cache_stats_t *p_stats) {
 		free(cache[i]);
 	}
 	free(victim_cache);
-
-
-
+	printf("my hit time : %f\n" , hit_time);
+	printf("my miss penalty : %f\n" , miss_penalty);
+	p_stats->hit_time = (uint64_t)hit_time;
+	p_stats->miss_penalty = (uint64_t)miss_penalty;
 }
 
 
 double get_hit_time(){
-	double hit_time = 0.2 * pow(2,ns);
+	int hit_time = (int) (0.2 * pow(2,ns));
 	return hit_time;
 }
 
