@@ -24,6 +24,7 @@ typedef struct cache_block_{
     uint64_t last_access_time;
 	uint64_t brought_in_time;
 	uint64_t tag;
+	uint64_t vtag;
     bool v[2];
 	bool dirty;
 } cache_block_t; 
