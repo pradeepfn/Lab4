@@ -22,9 +22,9 @@ struct cache_stats_t {
 
 typedef struct cache_block_{
     uint64_t last_access_time;
+	uint64_t brought_in_time;
 	uint64_t tag;
-    bool v0;
-	bool v1;
+    bool v[2];
 	bool dirty;
 } cache_block_t; 
 
