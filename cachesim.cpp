@@ -27,12 +27,7 @@ char blocking_policy;
 char replacement_policy;
 
 bool is_debug = false;
-double hit_time = 0;
-double miss_penalty = 0;
 
-double get_hit_time();
-double get_blocking_mpenalty();
-double get_sblocking_mpenalty();
 bool is_cblock_valid(cache_block_t cblock);
 
 /**
@@ -237,7 +232,6 @@ void cache_access(char rw, uint64_t address, cache_stats_t* p_stats) {
 	}
 	assert(tot==0 || tot==1);
 	// irrespective of a miss or hit this is a common overhead	
-	hit_time += get_hit_time(); 
 
 	for(i=0; i < ncache_blocks ; i++){
 		if(cache[set_index][i].tag == tag){ //cache hit
@@ -387,34 +381,38 @@ void cache_access(char rw, uint64_t address, cache_stats_t* p_stats) {
  */
 void complete_cache(cache_stats_t *p_stats) {
 // free memory	
+	uint64_t nblocks = (nsets*ncache_blocks + nvictim_cache_blocks);
+	uint64_t ob=nblocks; // dirty bit mandatory
 	uint64_t i;
 	for(i=0; i<nsets ; i++){
 		free(cache[i]);
 	}
 	free(victim_cache);
-	printf("my hit time : %f\n" , hit_time);
-	printf("my miss penalty : %f\n" , miss_penalty);
-	p_stats->hit_time = (uint64_t)hit_time;
-	p_stats->miss_penalty = (uint64_t)miss_penalty;
+		p_stats->hit_time = ceil(0.2 * pow(2,ns));
+	
+	//main cache tag overhead
+	ob += (64-(nc-ns))*nsets*ncache_blocks;
+	//victim cache tag overhead
+	ob += (64-nb)*nvictim_cache_blocks;
+	if(replacement_policy == 'L'){
+		ob+= (8*nblocks);
+	}else if(replacement_policy == 'N'){
+		ob+= (4*nsets*ncache_blocks) + 8*nvictim_cache_blocks;
+	}
+
+	if(blocking_policy == 'B'){
+		ob+=nblocks;
+		p_stats->miss_penalty = ceil(0.2 * pow(2,ns) + 50+ 0.25 * pow(2,nb));
+	}else if(blocking_policy == 'S'){
+		ob+=(2*nblocks);
+		p_stats->miss_penalty = ceil(0.2 * pow(2,ns) + 50+ 0.25 * pow(2,nb-1));
+	}
+	p_stats->miss_rate = (double)p_stats->misses/p_stats->accesses;
+	p_stats->avg_access_time = p_stats->hit_time + p_stats->miss_rate * p_stats->miss_penalty;
+	p_stats->storage_overhead = ob;
+	p_stats->storage_overhead_ratio = (double)ob/(8*(pow(2,nc) + pow(2,nb)*pow(2,nv)));
 }
 
-
-double get_hit_time(){
-	int hit_time = (int) (0.2 * pow(2,ns));
-	return hit_time;
-}
-
-
-double get_blocking_mpenalty(){
-	double blocking_penalty = 0.2*pow(2,ns) + 50 + 0.25*pow(2,nb);
-	return blocking_penalty;
-}
-
-
-double get_sblocking_mpenalty(){
-	double sblocking_penalty = 0.2*pow(2,ns) + 50 + 0.25*pow(2,(nb-1));
-	return sblocking_penalty;
-}
 
 bool is_cblock_valid(cache_block_t cblock){
  if(blocking_policy == SUBBLOCKING){
