@@ -1,0 +1,102 @@
+astar output 
+Cache Settings
+C: 15
+B: 5
+S: 3
+V: 1
+F: SUBBLOCKING
+R: LRU
+
+Cache Statistics
+Accesses: 501468
+Reads: 289766
+Read misses: 18957
+Read misses combined: 18957
+Writes: 211702
+Write misses: 76792
+Write misses combined: 76792
+Misses: 95749
+Hit Time: 2
+Miss Penalty: 56
+Miss rate: 0.190937
+Average access time (AAT): 12.692495
+Storage Overhead: 64652
+Storage Overhead Ratio: 0.246147
+
+
+bzip2 output 
+Cache Settings
+C: 15
+B: 6
+S: 5
+V: 2
+F: BLOCKING
+R: NMRU_FIFO
+
+Cache Statistics
+Accesses: 544514
+Reads: 369344
+Read misses: 467
+Read misses combined: 462
+Writes: 175170
+Write misses: 487
+Write misses combined: 485
+Misses: 947
+Hit Time: 7
+Miss Penalty: 73
+Miss rate: 0.001739
+Average access time (AAT): 7.126959
+Storage Overhead: 30992
+Storage Overhead Ratio: 0.117309
+
+
+mcf output 
+Cache Settings
+C: 15
+B: 4
+S: 5
+V: 2
+F: SUBBLOCKING
+R: NMRU_FIFO
+
+Cache Statistics
+Accesses: 507700
+Reads: 280182
+Read misses: 4605
+Read misses combined: 4499
+Writes: 227518
+Write misses: 19496
+Write misses combined: 19314
+Misses: 23813
+Hit Time: 7
+Miss Penalty: 59
+Miss rate: 0.046904
+Average access time (AAT): 9.767317
+Storage Overhead: 125212
+Storage Overhead Ratio: 0.476715
+
+
+perlbench output 
+Cache Settings
+C: 10
+B: 4
+S: 5
+V: 4
+F: BLOCKING
+R: LRU
+
+Cache Statistics
+Accesses: 507441
+Reads: 302052
+Read misses: 69481
+Read misses combined: 64456
+Writes: 205389
+Write misses: 37999
+Write misses combined: 35200
+Misses: 99656
+Hit Time: 7
+Miss Penalty: 61
+Miss rate: 0.196389
+Average access time (AAT): 18.979749
+Storage Overhead: 5536
+Storage Overhead Ratio: 0.540625
