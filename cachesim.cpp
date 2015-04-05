@@ -411,7 +411,6 @@ void complete_cache(cache_stats_t *p_stats) {
 	p_stats->avg_access_time = p_stats->hit_time + p_stats->miss_rate * p_stats->miss_penalty;
 	p_stats->storage_overhead = ob;
 	p_stats->storage_overhead_ratio = (double)ob/(8*(pow(2,nc) + pow(2,nb)*pow(2,nv)));
-	double tot_cache = (double)ob/8 + (pow(2,nc) + pow(2,nb)*pow(2,nv));
 	//printf("the total size of the cache system (KB) : %f \n" , tot_cache/1000);	
 }
 
